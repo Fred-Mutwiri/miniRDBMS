@@ -79,4 +79,16 @@ defmodule MiniRDBMS do
   defp dispatch(%{ type: :delete, table: table, where: where}) do
     MiniRDBMS.Table.delete(table, where)
   end
+
+  defp dispatch(%{
+       type: :select,
+       join: %{
+         left: left,
+         right: right,
+         on: {left_col, right_col}
+       }
+     }) do
+    MiniRDBMS.Executor.inner_join(left, right, left_col, right_col)
+  end
+
 end
