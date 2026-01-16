@@ -23,4 +23,16 @@ defmodule MiniRDBMS do
   def execute(_sql_string) do
     {:error, :not_implemented}
   end
+
+  def create_table(name, columns, opts \\ []) do
+    MiniRDBMS.Catalog.create_table(name, columns, opts)
+  end
+
+  def list_tables do
+    MiniRDBMS.Catalog.list_tables()
+  end
+
+  def get_table(name) do
+    MiniRDBMS.Catalog.get_table(name)
+  end
 end

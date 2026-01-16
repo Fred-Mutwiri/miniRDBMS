@@ -17,10 +17,7 @@ defmodule MiniRDBMS.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      # Starts a worker by calling: Minirdbms.Worker.start_link(arg)
-      # {Minirdbms.Worker, arg}
-
-      # children will be added incrementally as the system evolves
+      MiniRDBMS.Catalog
     ]
 
     opts = [strategy: :one_for_one, name: Minirdbms.Supervisor]
