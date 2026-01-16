@@ -5,6 +5,8 @@ defmodule MiniRDBMS.SQL.Parser do
       - INSERT INTO table (col, col) VALUES (val, val);
       - SELECT * FROM table;
       - SELECT * FROM table WHERE col = val;
+      - UPDATE table SET col = val WHERE col = val;
+      - DELETE FROM table WHERE col = val;
     This parser is intentionally naive:
       - No full SQL grammar
       - No error recovery
@@ -37,6 +39,8 @@ defmodule MiniRDBMS.SQL.Parser do
     cond do
       String.starts_with?(up, "INSERT") -> parse_insert(sql)
       String.starts_with?(up, "SELECT") -> parse_select(sql)
+      String.starts_with?(up, "UPDATE") -> parse_update(sql)
+      String.starts_with?(up, "DELETE") -> parse_delete(sql)
       true -> {:error, :unsupported_statement}
     end
   end
@@ -173,4 +177,47 @@ defmodule MiniRDBMS.SQL.Parser do
   end
 
 
+  defp parse_update(sql) do
+    #UPDATE users SET active = false WHERE id = 3
+
+    with [_, rest] <- String.split(sql, "UPDATE", parts: 2),
+         [table_part, rest] <- String.split(rest, "SET", parts: 2),
+         [set_part, where_part] <- String.split(rest, "WHERE", parts: 2) do
+      {:ok,
+        %{
+          type: :update,
+          table: table_part |> String.trim() |> String.to_atom(),
+          set: parse_assignments(set_part),
+          where: parse_where(where_part)
+        }
+    }  else
+      _ -> {:error, :invalid_update_syntax}
+    end
+  end
+
+  defp parse_assignments(segment) do
+    # col = val, col = cal
+    segment
+    |> String.split(",")
+    |> Enum.map(&String.split(&1, "=", parts: 2))
+    |> Enum.map(fn [k,v] ->
+      {String.to_atom(String.trim(k)), parse_literal(v)}
+    end)
+    |> Map.new()
+  end
+
+  defp parse_delete(sql) do
+    #DELETE FROM users WHERE active = false
+    with [_,rest] <- String.split(sql, "FROM", parts: 2),
+         [table_part, where_part] <- String.split(rest, "WHERE", parts: 2) do
+      {:ok,
+        %{
+          type: :delete,
+          table: table_part |> String.trim() |> String.to_atom(),
+          where: parse_where(where_part)
+        }
+    }  else
+      _ -> {:error, :invalid_delete_syntax}
+        end
+  end
 end

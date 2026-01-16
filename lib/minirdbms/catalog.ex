@@ -21,7 +21,7 @@ defmodule MiniRDBMS.Catalog do
   @doc """
   Starts the catalog process
   """
-  def start_link(opts \\ []) do
+  def start_link(_opts \\ []) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
 

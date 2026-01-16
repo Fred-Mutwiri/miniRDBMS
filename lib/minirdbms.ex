@@ -71,4 +71,12 @@ defmodule MiniRDBMS do
   defp dispatch(%{type: :select, table: table, where: where}) do
     MiniRDBMS.Table.select(table, where)
   end
+
+  defp dispatch(%{type: :update, table: table, set: updates, where: where}) do
+    MiniRDBMS.Table.update(table, updates, where)
+  end
+
+  defp dispatch(%{ type: :delete, table: table, where: where}) do
+    MiniRDBMS.Table.delete(table, where)
+  end
 end

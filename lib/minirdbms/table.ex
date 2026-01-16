@@ -16,6 +16,12 @@ defmodule MiniRDBMS.Table do
     - No ordering
     * These will be layered on incrementally.
 
+    WHERE semantics:
+    - Equality only
+    - AND-only (implicit)
+    - No OR, no ranges
+    These limitations are intentional and documented.
+
   This process is the sole authority for mutating table data.
   """
 
@@ -45,6 +51,24 @@ defmodule MiniRDBMS.Table do
   def select(table_name, where \\ nil) do
     GenServer.call(via_name(table_name), {:select, where})
   end
+
+  @doc """
+  updates rows matching the WHERE clause.
+  Returns the number of Rows updated
+  """
+  def update(table_name, updates, where) do
+    GenServer.call(via_name(table_name), {:update, updates, where})
+  end
+
+  @doc """
+  Deletes rows matching the WHERE clause.
+
+  Returns the number of rows deleted.
+  """
+  def delete(table_name, where) do
+    GenServer.call(via_name(table_name), {:delete, where})
+  end
+
 
 
 
@@ -93,6 +117,30 @@ defmodule MiniRDBMS.Table do
     {:reply, {:ok, rows}, state}
   end
 
+  def handle_call({:update, updates, where}, _from, state) do
+    {updated_rows, count} =
+      Enum.map_reduce(state.rows, 0, fn {pk, row}, acc ->
+        if matches_where?(row, where) do
+          {{pk, Map.merge(row, updates)}, acc + 1}
+        else
+          {{pk, row}, acc}
+        end
+      end)
+
+    new_rows = Map.new(updated_rows)
+    {:reply, {:ok, count}, %{state | rows: new_rows}}
+  end
+
+  def handle_call({:delete, where}, _from, state) do
+    {remaining, _deleted} =
+      Enum.split_with(state.rows, fn {_pk, row} ->
+        not matches_where?(row, where)
+      end)
+
+    new_rows = Map.new(remaining)
+    {:reply, {:ok, map_size(state.rows) - map_size(new_rows)}, %{state | rows: new_rows}}
+  end
+
 
 
 
@@ -138,6 +186,32 @@ defmodule MiniRDBMS.Table do
     end)
   end
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  #internal helpers
+
+
   defp primary_key_value(%Schema{primary_key: pk}, row) do
     Map.get(row, pk)
   end
@@ -168,6 +242,15 @@ defmodule MiniRDBMS.Table do
       end)
     end)
   end
+
+  defp matches_where?(_row, nil), do: true
+
+  defp matches_where?(row, where) when is_map(where) do
+    Enum.all?(where, fn {column, value} ->
+      Map.get(row, column) == value
+    end)
+  end
+
 
 
 
