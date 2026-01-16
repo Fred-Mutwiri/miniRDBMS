@@ -79,7 +79,8 @@ defmodule MiniRDBMS.Table do
     state = %{
       schema: schema,
       rows: %{},
-      unique_indexes: init_unique_indexes(schema)
+      unique_indexes: init_unique_indexes(schema),
+      indexes: init_indexes(schema)
     }
 
     {:ok, state}
@@ -96,6 +97,7 @@ defmodule MiniRDBMS.Table do
             state
             |> put_row(pk, row)
             |> update_unique_indexes(row)
+            |> update_indexes_on_insert(pk, row)
 
           {:reply, {:ok, row}, new_state}
     else
@@ -108,14 +110,31 @@ defmodule MiniRDBMS.Table do
   @impl true
   def handle_call({:select, where}, _from, state) do
     rows =
-      state.rows
-      |> Map.values()
-      |> apply_where(where)
+      cond do
+        is_map(where) and map_size(where) == 1 ->
+          [{column, value}] = Map.to_list(where)
+          select_with_optional_index(state, column, value, where)
 
-    # return rows without altering state. this keeps SELECT referentially transparent from the outside
+        true ->
+          state.rows
+          |> Map.values()
+          |> apply_where(where)
+      end
 
     {:reply, {:ok, rows}, state}
   end
+
+
+  # def handle_call({:select, where}, _from, state) do
+  #   rows =
+  #     state.rows
+  #     |> Map.values()
+  #     |> apply_where(where)
+
+  #   # return rows without altering state. this keeps SELECT referentially transparent from the outside
+
+  #   {:reply, {:ok, rows}, state}
+  # end
 
   def handle_call({:update, updates, where}, _from, state) do
     {updated_rows, count} =
@@ -127,18 +146,28 @@ defmodule MiniRDBMS.Table do
         end
       end)
 
-    new_rows = Map.new(updated_rows)
-    {:reply, {:ok, count}, %{state | rows: new_rows}}
+     new_state =
+      state
+      |> Map.put(:rows, Map.new(updated_rows))
+      |> rebuild_indexes()
+      |> rebuild_unique_indexes()
+
+    {:reply, {:ok, count}, new_state}
   end
 
   def handle_call({:delete, where}, _from, state) do
-    {remaining, _deleted} =
+    {remaining, deleted} =
       Enum.split_with(state.rows, fn {_pk, row} ->
         not matches_where?(row, where)
       end)
 
-    new_rows = Map.new(remaining)
-    {:reply, {:ok, map_size(state.rows) - map_size(new_rows)}, %{state | rows: new_rows}}
+    new_state =
+      state
+      |> Map.put(:rows, Map.new(remaining))
+      |> rebuild_indexes()
+      |> rebuild_unique_indexes()
+
+    {:reply, {:ok, length(deleted)}, new_state}
   end
 
 
@@ -186,7 +215,76 @@ defmodule MiniRDBMS.Table do
     end)
   end
 
+  defp init_indexes(%Schema{indexes: indexed_columns}) do
+    Map.new(indexed_columns, fn col ->
+      {col, %{}}
+    end)
+  end
 
+  defp update_indexes_on_insert(state, pk, row) do
+    new_indexes =
+      Enum.reduce(state.indexes, %{}, fn {col, index}, acc ->
+        value = Map.get(row, col)
+
+        updated =
+          Map.update(index, value, MapSet.new([pk]), fn set ->
+            MapSet.put(set, pk)
+          end)
+
+        Map.put(acc, col, updated)
+      end)
+
+    %{state | indexes: new_indexes}
+  end
+
+  defp rebuild_indexes(%{schema: schema, rows: rows} = state) do
+    new_indexes =
+      Enum.reduce(schema.indexes, %{}, fn col, acc ->
+        index =
+          Enum.reduce(rows, %{}, fn {pk, row}, acc ->
+            value = Map.get(row, col)
+
+            Map.update(acc, value, MapSet.new([pk]), fn set ->
+              MapSet.put(set, pk)
+            end)
+          end)
+
+        Map.put(acc, col, index)
+      end)
+
+    %{state | indexes: new_indexes}
+  end
+
+
+  defp rebuild_unique_indexes(%{schema: schema, rows: rows} = state) do
+    new_unique =
+      Enum.reduce(schema.unique, %{}, fn col, acc ->
+        values =
+          rows
+          |> Map.values()
+          |> Enum.map(&Map.get(&1, col))
+          |> MapSet.new()
+
+        Map.put(acc, col, values)
+      end)
+
+    %{state | unique_indexes: new_unique}
+  end
+
+
+  defp select_with_optional_index(state, column, value, where) do
+    case Map.get(state.indexes, column) do
+      nil ->
+        state.rows
+        |> Map.values()
+        |> apply_where(where)
+
+      index ->
+        index
+        |> Map.get(value, MapSet.new())
+        |> Enum.map(&Map.get(state.rows, &1))
+    end
+  end
 
 
 

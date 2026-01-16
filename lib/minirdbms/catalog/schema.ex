@@ -10,6 +10,7 @@ defmodule MiniRDBMS.Catalog.Schema do
     :name,
     :columns,
     primary_key: nil,
-    unique: []
+    unique: [],
+    indexes: []
   ]
 end
