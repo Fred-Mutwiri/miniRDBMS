@@ -15,12 +15,19 @@ defmodule MiniRDBMS do
   end
 
   @doc """
-    Executes a SQL-like command against the database.
-    This function will later coordinate parsing, planning,
-    and execution.
+    Executes a SQL-like command string.
+    This function:
+      - parses SQL
+      - dispatches to the appropriate table operation
+    Planning and optimization are intentionally minimal at this stage.
   """
-  def execute(_sql_string) do
-    {:error, :not_implemented}
+  def execute(sql) when is_binary(sql) do
+    with {:ok, ast} <- MiniRDBMS.SQL.Parser.parse(sql),
+         {:ok, result} <- dispatch(ast) do
+      {:ok, result}
+    else
+      error -> error
+     end
   end
 
   def create_table(name, columns, opts \\ []) do
@@ -49,5 +56,19 @@ defmodule MiniRDBMS do
   """
   def select(table_name, where \\ nil) do
     MiniRDBMS.Table.select(table_name, where)
+  end
+
+
+
+
+  #internal helpers
+
+  defp dispatch(%{type: :insert, table: table, columns: cols, values: vals}) do
+    row = Enum.zip(cols, vals) |> Map.new()
+    MiniRDBMS.Table.insert(table, row)
+  end
+
+  defp dispatch(%{type: :select, table: table, where: where}) do
+    MiniRDBMS.Table.select(table, where)
   end
 end
