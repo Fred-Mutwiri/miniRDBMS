@@ -35,4 +35,8 @@ defmodule MiniRDBMS do
   def get_table(name) do
     MiniRDBMS.Catalog.get_table(name)
   end
+
+  def insert(table_name, row) do
+    MiniRDBMS.Table.insert(table_name, row)
+  end
 end

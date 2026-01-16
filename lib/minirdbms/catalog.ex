@@ -14,6 +14,7 @@ defmodule MiniRDBMS.Catalog do
 
   use GenServer
   alias MiniRDBMS.Catalog.Schema
+  alias MiniRDBMS.Table
 
 
   #public api
@@ -67,6 +68,8 @@ defmodule MiniRDBMS.Catalog do
           primary_key: Keyword.get(opts, :primary_key),
           unique: Keyword.get(opts, :unique, [])
         }
+      {:ok, _pid} = Table.start_link(schema)
+
       {:reply, {:ok, schema}, Map.put(state, name, schema) }
     end
   end
