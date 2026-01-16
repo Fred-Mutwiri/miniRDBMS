@@ -7,6 +7,15 @@ defmodule MiniRDBMS.Table do
   - its primary key index
   - its unique constraints
 
+  now has insert and Select
+
+  Limitations (by design, for now):
+    - No projections (SELECT column list)
+    - No OR conditions
+    - No range predicates
+    - No ordering
+    * These will be layered on incrementally.
+
   This process is the sole authority for mutating table data.
   """
 
@@ -21,6 +30,20 @@ defmodule MiniRDBMS.Table do
 
   def insert(table_name, row) do
     GenServer.call(via_name(table_name), {:insert, row})
+  end
+
+  @doc """
+  Returns rows from a table, optionally filtered by a WHERE clause.
+  the `where arguement is either:
+    -nil(no filtering)
+    - a mapof column => valuepairs (equality only)
+
+  Examples:
+    select(:users, nil)
+    select(:users, %{active: true})
+  """
+  def select(table_name, where \\ nil) do
+    GenServer.call(via_name(table_name), {:select, where})
   end
 
 
@@ -58,7 +81,30 @@ defmodule MiniRDBMS.Table do
   end
 
 
+  @impl true
+  def handle_call({:select, where}, _from, state) do
+    rows =
+      state.rows
+      |> Map.values()
+      |> apply_where(where)
+
+    # return rows without altering state. this keeps SELECT referentially transparent from the outside
+
+    {:reply, {:ok, rows}, state}
+  end
+
+
+
+
+
+
+
+
+
+
+
   #internal helpers
+  #______________________________________________________________________________________________________________________
   defp via_name(table_name) do
     {:via, Registry, {MiniRDBMS.TableRegistry, table_name}}
   end
@@ -112,6 +158,16 @@ defmodule MiniRDBMS.Table do
       %{state | unique_indexes: new_indexes}
   end
 
+  @doc false
+  defp apply_where(rows, nil), do: rows
+
+  defp apply_where(rows, where) when is_map(where) do
+    Enum.filter(rows, fn row ->
+      Enum.all?(where, fn {column, value} ->
+        Map.get(row, column) == value
+      end)
+    end)
+  end
 
 
 

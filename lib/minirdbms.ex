@@ -15,10 +15,9 @@ defmodule MiniRDBMS do
   end
 
   @doc """
-  Executes a SQL-like command against the database.
-
-  This function will later coordinate parsing, planning,
-  and execution.
+    Executes a SQL-like command against the database.
+    This function will later coordinate parsing, planning,
+    and execution.
   """
   def execute(_sql_string) do
     {:error, :not_implemented}
@@ -38,5 +37,17 @@ defmodule MiniRDBMS do
 
   def insert(table_name, row) do
     MiniRDBMS.Table.insert(table_name, row)
+  end
+
+  @doc """
+    Executes a SELECT against a table.
+    Currently supports:
+    - SELECT *
+    - Optional WHERE with equality filters
+    Returns:
+        {:ok, list_of_rows}
+  """
+  def select(table_name, where \\ nil) do
+    MiniRDBMS.Table.select(table_name, where)
   end
 end
