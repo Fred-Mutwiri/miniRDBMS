@@ -16,11 +16,31 @@ defmodule MiniRDBMS.Application do
 
   @impl true
   def start(_type, _args) do
+
     children = [
       {Registry, keys: :unique, name: MiniRDBMS.TableRegistry},
+
+      # Core DB
       MiniRDBMS.Catalog,
-      {Task, fn -> MiniRDBMS.Bootstrap.start() end},
-      MiniRDBMSWeb.Application
+
+       # Persistence bootstrap
+      Supervisor.child_spec(
+        {Task, fn -> MiniRDBMS.Bootstrap.start() end},
+        id: :storage_bootstrap
+      ),
+
+      # Web domain bootstrap
+      Supervisor.child_spec(
+        {Task, fn -> MiniRDBMSWeb.Bootstrap.init_domain!() end},
+        id: :web_domain_bootstrap
+      ),
+
+      # HTTP server
+      {Plug.Cowboy,
+       scheme: :http,
+       plug: MiniRDBMSWeb.Router,
+       options: [port: 4000]}
+
     ]
 
     opts = [strategy: :one_for_one, name: Minirdbms.Supervisor]
