@@ -31,16 +31,7 @@ defmodule MiniRDBMS do
     end
   end
 
-  #commented now obsolete.
-  # def execute(sql) when is_binary(sql) do
-  #   with {:ok, ast} <- MiniRDBMS.SQL.Parser.parse(sql),
-  #        {:ok, result} <- dispatch(ast) do
-  #     {:ok, result}
-  #   else
-  #     error -> error
-  #    end
-  # end
-
+  #metadata helpers:
   def create_table(name, columns, opts \\ []) do
     MiniRDBMS.Catalog.create_table(name, columns, opts)
   end
@@ -53,53 +44,5 @@ defmodule MiniRDBMS do
     MiniRDBMS.Catalog.get_table(name)
   end
 
-  def insert(table_name, row) do
-    MiniRDBMS.Table.insert(table_name, row)
-  end
-
-  @doc """
-    Executes a SELECT against a table.
-    Currently supports:
-    - SELECT *
-    - Optional WHERE with equality filters
-    Returns:
-        {:ok, list_of_rows}
-  """
-  def select(table_name, where \\ nil) do
-    MiniRDBMS.Table.select(table_name, where)
-  end
-
-
-
-
-  #internal helpers
-
-  defp dispatch(%{type: :insert, table: table, columns: cols, values: vals}) do
-    row = Enum.zip(cols, vals) |> Map.new()
-    MiniRDBMS.Table.insert(table, row)
-  end
-
-  defp dispatch(%{type: :select, table: table, where: where}) do
-    MiniRDBMS.Table.select(table, where)
-  end
-
-  defp dispatch(%{type: :update, table: table, set: updates, where: where}) do
-    MiniRDBMS.Table.update(table, updates, where)
-  end
-
-  defp dispatch(%{ type: :delete, table: table, where: where}) do
-    MiniRDBMS.Table.delete(table, where)
-  end
-
-  defp dispatch(%{
-       type: :select,
-       join: %{
-         left: left,
-         right: right,
-         on: {left_col, right_col}
-       }
-     }) do
-    MiniRDBMS.Executor.inner_join(left, right, left_col, right_col)
-  end
 
 end

@@ -9,17 +9,19 @@ defmodule MiniRDBMS.Executor do
 
   alias MiniRDBMS.Table
 
-  @doc """
-  Performs a simple INNER JOIN using nested loops.
 
-  Semantics:
-  - equality only
-  - no WHERE
-  - returns merged rows
-  """
 
   alias MiniRDBMS.Planner.Plan
+  alias MiniRDBMS.Catalog
+  alias MiniRDBMS.Types
 
+  @doc """
+    Performs a simple INNER JOIN using nested loops.
+    Semantics:
+      - equality only
+      - no WHERE
+      - returns merged rows
+  """
   def inner_join(left_table, right_table, left_col, right_col) do
     {:ok, left_rows} = Table.select(left_table)
     {:ok, right_rows} = Table.select(right_table)
@@ -46,8 +48,14 @@ defmodule MiniRDBMS.Executor do
   def execute(%Plan{type: :insert, insert: insert_ast}) do
     %{table: table, columns: cols, values: vals} = insert_ast
     row = Enum.zip(cols, vals) |> Map.new()
-    Table.insert(table, row)
+
+    with {:ok, schema} <- Catalog.get_table(table),
+        {:ok, casted_row} <- validate_and_cast_row(schema, row),
+        {:ok, inserted} <- Table.insert(table, casted_row) do
+      {:ok, inserted}
+    end
   end
+
 
   def execute(%Plan{type: :select, table: table, where: where}) do
     Table.select(table, where)
@@ -84,4 +92,20 @@ defmodule MiniRDBMS.Executor do
     end)
    end)
   end
+
+  defp validate_and_cast_row(schema, row) do
+    Enum.reduce_while(schema.columns, {:ok, %{}}, fn {col, type}, {:ok, acc} ->
+      case Map.fetch(row, col) do
+        {:ok, value} ->
+          case Types.cast(type, value) do
+            {:ok, casted} -> {:cont, {:ok, Map.put(acc, col, casted)}}
+            {:error, _} -> {:halt, {:error, {:invalid_type, col}}}
+          end
+
+        :error ->
+          {:halt, {:error, {:missing_column, col}}}
+      end
+    end)
+  end
+
 end
