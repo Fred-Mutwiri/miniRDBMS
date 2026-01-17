@@ -42,6 +42,20 @@ defmodule MiniRDBMSWeb.Router do
   get "/merchants/:id" do
     MiniRDBMSWeb.MerchantHandler.get(conn, id)
   end
+
+  post "/merchants" do
+    MiniRDBMSWeb.MerchantHandler.create(conn, conn.body_params)
+  end
+
+  put "/merchants/:id" do
+    MiniRDBMSWeb.MerchantHandler.update(conn, id, conn.body_params)
+  end
+
+  delete "/merchants/:id" do
+    MiniRDBMSWeb.MerchantHandler.delete(conn, id)
+  end
+
+
   match _ do
     send_resp(conn, 404, "not found")
   end

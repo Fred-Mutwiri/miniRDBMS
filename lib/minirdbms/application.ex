@@ -19,7 +19,8 @@ defmodule MiniRDBMS.Application do
     children = [
       {Registry, keys: :unique, name: MiniRDBMS.TableRegistry},
       MiniRDBMS.Catalog,
-      {Task, fn -> MiniRDBMS.Bootstrap.start() end}
+      {Task, fn -> MiniRDBMS.Bootstrap.start() end},
+      MiniRDBMSWeb.Application
     ]
 
     opts = [strategy: :one_for_one, name: Minirdbms.Supervisor]

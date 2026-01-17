@@ -1,20 +1,12 @@
 defmodule MiniRDBMSWeb.Application do
-  @moduledoc """
-  OTP application entry point for the MiniRDBMS web interface.
+  use Supervisor
 
-  Responsibilities:
-  - start the HTTP server
-  - ensure the database application is running
-
-  This application is a *client* of MiniRDBMS.
-  It does not access internal database modules directly.
-  """
-
-  use Application
+  def start_link(_opts) do
+    Supervisor.start_link(__MODULE__, :ok, name: __MODULE__)
+  end
 
   @impl true
-  def start(_type, _args) do
-    # Ensure the database is started before accepting requests
+  def init(:ok) do
     MiniRDBMS.start()
     MiniRDBMSWeb.Bootstrap.init_domain!()
 
@@ -25,7 +17,6 @@ defmodule MiniRDBMSWeb.Application do
        options: [port: 4000]}
     ]
 
-    opts = [strategy: :one_for_one, name: MiniRDBMSWeb.Supervisor]
-    Supervisor.start_link(children, opts)
+    Supervisor.init(children, strategy: :one_for_one)
   end
 end
