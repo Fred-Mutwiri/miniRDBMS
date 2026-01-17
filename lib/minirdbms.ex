@@ -23,12 +23,23 @@ defmodule MiniRDBMS do
   """
   def execute(sql) when is_binary(sql) do
     with {:ok, ast} <- MiniRDBMS.SQL.Parser.parse(sql),
-         {:ok, result} <- dispatch(ast) do
+         {:ok, plan} <- MiniRDBMS.Planner.plan(ast),
+         {:ok, result} <- MiniRDBMS.Executor.execute(plan) do
       {:ok, result}
     else
       error -> error
-     end
+    end
   end
+
+  #commented now obsolete.
+  # def execute(sql) when is_binary(sql) do
+  #   with {:ok, ast} <- MiniRDBMS.SQL.Parser.parse(sql),
+  #        {:ok, result} <- dispatch(ast) do
+  #     {:ok, result}
+  #   else
+  #     error -> error
+  #    end
+  # end
 
   def create_table(name, columns, opts \\ []) do
     MiniRDBMS.Catalog.create_table(name, columns, opts)
