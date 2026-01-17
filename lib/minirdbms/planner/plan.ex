@@ -20,6 +20,11 @@ defmodule MiniRDBMS.Planner.Plan do
     :where,
     :join,
     :updates,
-    :insert
+    :insert,
+    index_hint: nil
   ]
+  @typedoc """
+    Index hint indicates that an equality predicate may
+    benefit from an index on the given column.
+  """
 end

@@ -46,9 +46,21 @@ defmodule MiniRDBMS.Planner do
     %Plan{
       type: :select,
       table: ast.table,
-      where: ast.where
+      where: ast.where,
+      index_hint: index_hint(ast.where)
     }
   end
+
+  defp do_plan(%{type: :update} = ast) do
+    %Plan{
+      type: :update,
+      table: ast.table,
+      updates: ast.set,
+      where: ast.where,
+      index_hint: index_hint(ast.where)
+    }
+  end
+
 
   defp do_plan(%{type: :delete} = ast) do
     %Plan{
@@ -57,4 +69,14 @@ defmodule MiniRDBMS.Planner do
       where: ast.where
     }
   end
+
+
+  defp index_hint(nil), do: nil
+
+  defp index_hint(where) when is_map(where) and map_size(where) == 1 do
+    [{column, _value}] = Map.to_list(where)
+    column
+  end
+
+  defp index_hint(_), do: nil
 end
