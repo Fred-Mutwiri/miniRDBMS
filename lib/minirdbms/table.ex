@@ -28,6 +28,8 @@ defmodule MiniRDBMS.Table do
   use GenServer
 
   alias MiniRDBMS.Catalog.Schema
+  alias MiniRDBMS.Storage
+
 
   ###public api
   def start_link(%Schema{} = schema) do
@@ -76,15 +78,29 @@ defmodule MiniRDBMS.Table do
   #GenServer Callbacks
   @impl true
   def init(schema) do
-    state = %{
-      schema: schema,
-      rows: %{},
-      unique_indexes: init_unique_indexes(schema),
-      indexes: init_indexes(schema)
-    }
+    # Attempt to load persisted state
+    state =
+      case Storage.load(schema.name) do
+        {:ok, persisted_state} ->
+          # Ensure schema field is updated
+          Map.put(persisted_state, :schema, schema)
+
+        {:error, :not_found} ->
+          %{
+            schema: schema,
+            rows: %{},
+            unique_indexes: init_unique_indexes(schema),
+            indexes: init_indexes(schema)
+          }
+      end
+
+    # Persist immediately to guarantee consistency on disk
+    Storage.save(schema.name, state)
 
     {:ok, state}
   end
+
+
 
   @impl true
   def handle_call( {:insert, row}, _from, state )do
@@ -98,6 +114,8 @@ defmodule MiniRDBMS.Table do
             |> put_row(pk, row)
             |> update_unique_indexes(row)
             |> update_indexes_on_insert(pk, row)
+
+          Storage.save(state.schema.name, new_state)
 
           {:reply, {:ok, row}, new_state}
     else
@@ -146,11 +164,13 @@ defmodule MiniRDBMS.Table do
         end
       end)
 
-     new_state =
+    new_state =
       state
       |> Map.put(:rows, Map.new(updated_rows))
       |> rebuild_indexes()
       |> rebuild_unique_indexes()
+
+    Storage.save(state.schema.name, new_state)
 
     {:reply, {:ok, count}, new_state}
   end
@@ -166,6 +186,8 @@ defmodule MiniRDBMS.Table do
       |> Map.put(:rows, Map.new(remaining))
       |> rebuild_indexes()
       |> rebuild_unique_indexes()
+
+    Storage.save(state.schema.name, new_state)
 
     {:reply, {:ok, length(deleted)}, new_state}
   end

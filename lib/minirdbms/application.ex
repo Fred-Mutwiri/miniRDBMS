@@ -18,10 +18,13 @@ defmodule MiniRDBMS.Application do
   def start(_type, _args) do
     children = [
       {Registry, keys: :unique, name: MiniRDBMS.TableRegistry},
-      MiniRDBMS.Catalog
+      MiniRDBMS.Catalog,
+      {Task, fn -> MiniRDBMS.Bootstrap.start() end}
     ]
 
     opts = [strategy: :one_for_one, name: Minirdbms.Supervisor]
     Supervisor.start_link(children, opts)
+
+
   end
 end

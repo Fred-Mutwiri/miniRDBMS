@@ -47,6 +47,14 @@ defmodule MiniRDBMS.Catalog do
     GenServer.call(__MODULE__, :list_tables)
   end
 
+  @doc """
+    Registers a schema in the catalog without starting a new table.
+    Used by bootstrap to restore persisted tables.
+  """
+  def register_schema(%Schema{name: name} = schema) do
+    GenServer.call(__MODULE__, {:register_schema, name, schema})
+  end
+
 
 
 
@@ -88,6 +96,14 @@ defmodule MiniRDBMS.Catalog do
   end
 
 
+  @impl true
+  def handle_call({:register_schema, name, schema}, _from, state) do
+    if Map.has_key?(state, name) do
+      {:reply, {:error, :schema_already_registered}, state}
+    else
+      {:reply, :ok, Map.put(state, name, schema)}
+    end
+  end
 
 
 
